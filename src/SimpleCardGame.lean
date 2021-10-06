@@ -116,7 +116,15 @@ structure GameState where
   priority: PriorityOwner
   didEveryPlayerPassTheirPriority: Bool
   playerStates: PlayerStateStore
-  deriving Inhabited
+instance : Inhabited GameState where
+  default := {
+    setting := Inhabited.default,
+    turnList := [player₁],
+    phaseList := defaultPhaseList,
+    priority := Inhabited.default,
+    didEveryPlayerPassTheirPriority := Inhabited.default,
+    playerStates := Inhabited.default,
+  }
 
 inductive PriorityRel: GameState → GameState → Prop
 | passPriority: ∀(s: GameState) (p: Player),
