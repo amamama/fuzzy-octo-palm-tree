@@ -1,4 +1,5 @@
 import Std.Data.HashSet
+import Std.Data.AssocList
 /-
 TODO: ステップの進行時に誘発型能力の誘発をできるようにする．
 置換型能力を取り扱うため，eventキューを用意し，ゲーム内の行動は一旦このキューにエンキューされる．
@@ -29,6 +30,11 @@ def NextPlayerType.default: NextPlayerType
 | player₃ => player₄
 | player₄ => player₁
 instance : Inhabited NextPlayerType where default := NextPlayerType.default
+def PlayerToNat: Player → Nat
+| player₁ => 0
+| player₂ => 1
+| player₃ => 2
+| player₄ => 3
 
 inductive BeginningPhase: Type
 | untap -- MEMO: namae kaeru yotei
@@ -84,8 +90,18 @@ def defaultPhaseList :=
   ++ defaultEndingPhase
 
 structure GameSetting where
+  joinedPlayers: Std.AssocList Player Bool
   nextplayer: NextPlayerType
-  deriving Inhabited
+instance : Inhabited GameSetting where
+  default := {
+    joinedPlayers:= 
+      Std.AssocList.empty
+      |> Std.AssocList.cons player₁ true
+      |> Std.AssocList.cons player₂ true
+      |> Std.AssocList.cons player₃ false
+      |> Std.AssocList.cons player₄ false,
+      nextplayer := Inhabited.default,
+  }
 def Zone := Std.HashSet Nat
   deriving Inhabited
 structure PlayerState where
@@ -95,20 +111,56 @@ structure PlayerState where
   --graveyard: Zone
   --pool: Int
   passPriority: Bool
-  deriving Inhabited
-def PlayerStateStore := Player → PlayerState
-  deriving Inhabited
-def UpdatePlayerStateStore (st: PlayerStateStore) (p: Player) (ps: PlayerState): PlayerStateStore :=
-  λp' => if p = p' then ps else st p'
-def PlayerStateStore.getOp (self: PlayerStateStore) (idx: Player) : PlayerState := self idx
-notation:100 st "[ " pl " ↦ " ps " ]" => UpdatePlayerStateStore st pl ps
+  --deriving Inhabited de arbitrary ni narunode kou sinaito ikenai
+def PlayerState.default: PlayerState := {
+  hand := Inhabited.default,
+  deck := Inhabited.default,
+  --life: Int
+  --graveyard: Zone
+  --pool: Int
+  passPriority := false
+}
+instance : Inhabited PlayerState where
+  default := PlayerState.default  
 
+structure PlayerStateStore where
+  p₁: PlayerState
+  p₂: PlayerState
+  p₃: PlayerState
+  p₄: PlayerState
+  --deriving Inhabited de arbitrary ni narunode kou sinaito ikenai
+def PlayerStateStore.default: PlayerStateStore := {
+  p₁:= Inhabited.default, 
+  p₂:= Inhabited.default,
+  p₃:= Inhabited.default,
+  p₄:= Inhabited.default,
+}
+instance : Inhabited PlayerStateStore where
+  default := PlayerStateStore.default
+
+def UpdatePlayerStateStore (st: PlayerStateStore) (idx: Player) (ps: PlayerState): PlayerStateStore :=
+  match idx with
+  | player₁ => {st with p₁ := ps}
+  | player₂ => {st with p₂ := ps}
+  | player₃ => {st with p₃ := ps}
+  | player₄ => {st with p₄ := ps}
+def PlayerStateStore.getOp (self: PlayerStateStore) (idx: Player) : PlayerState :=
+  match idx with
+  | player₁ => self.p₁
+  | player₂ => self.p₂
+  | player₃ => self.p₃
+  | player₄ => self.p₄
+notation:100 st "[ " pl " ↦ " ps " ]" => UpdatePlayerStateStore st pl ps
 #print Std.HashSet
 
 inductive PriorityOwner
 | none
 | player(p: Player)
-deriving Inhabited
+--deriving Inhabited
+--honto ha default wo none ni sinaito ikenai
+instance : Inhabited PriorityOwner where
+  default := PriorityOwner.player player₁
+
 structure GameState where
   setting: GameSetting
   turnList: TurnList
@@ -116,15 +168,25 @@ structure GameState where
   priority: PriorityOwner
   didEveryPlayerPassTheirPriority: Bool
   playerStates: PlayerStateStore
+def GameState.default: GameState := {
+  setting := Inhabited.default,
+  turnList := [player₁],
+  phaseList := defaultPhaseList,
+  priority := Inhabited.default,
+  didEveryPlayerPassTheirPriority := Inhabited.default,
+  playerStates := Inhabited.default,
+}
+
 instance : Inhabited GameState where
-  default := {
-    setting := Inhabited.default,
-    turnList := [player₁],
-    phaseList := defaultPhaseList,
-    priority := Inhabited.default,
-    didEveryPlayerPassTheirPriority := Inhabited.default,
-    playerStates := Inhabited.default,
-  }
+  default := GameState.default
+
+def updatePriority (ps: PlayerStateStore) (pl: Player) (p: Bool) :=
+  ps[pl ↦ {ps[pl] with passPriority := p}]
+def updateEveryPriority (ps: PlayerStateStore) (p: Bool) :=
+  let ps₁ := updatePriority ps player₁ p;
+  let ps₂ := updatePriority ps₁ player₂ p;
+  let ps₃ := updatePriority ps₂ player₃ p;
+  updatePriority ps₃ player₄ p
 
 inductive PriorityRel: GameState → GameState → Prop
 | passPriority: ∀(s: GameState) (p: Player),
@@ -133,27 +195,44 @@ inductive PriorityRel: GameState → GameState → Prop
   {
     s with
     priority := PriorityOwner.player (s.setting.nextplayer p),
-    playerStates :=
-      s.playerStates[p ↦
-        {
-          s.playerStates[p] with
-          passPriority := true
-        }
-      ]
+    playerStates := updatePriority s.playerStates p true
   } -- MEMO: koko motto iikannji ni sitai
+| transPriority: ∀s₁ s₂ s₃,
+  PriorityRel s₁ s₂
+  → PriorityRel s₂ s₃
+  → PriorityRel s₁ s₃
+| everyPlayerPassTheirPriority: ∀(s: GameState) (p: Player) (tl: TurnList),
+  s.priority = PriorityOwner.player p
+  ∧ s.turnList = p :: tl
+  ∧ (∀(p: Player),
+    Std.AssocList.contains p s.setting.joinedPlayers
+    ∧ Std.AssocList.findEntry? p s.setting.joinedPlayers = some (p, true)
+    ∧ s.playerStates[p].passPriority = true)
+  → PriorityRel s
+  {
+    s with
+    playerStates := updateEveryPriority s.playerStates false
+  }
 -- その他の行動をできるようにする
+
 
 inductive ProgressPhaseRel: GameState → GameState → Prop
 | nextStep: ∀(s: GameState) (p: Phase) (next: PhaseList),
   s.phaseList = p::next ∧ s.didEveryPlayerPassTheirPriority = true
   → ProgressPhaseRel s {s with phaseList := next, didEveryPlayerPassTheirPriority := false}
   -- ターン起因処理と状況起因処理，誘発型能力の誘発をした状態にする
+  -- これnextがcleanupのときも進行してやばいね
 -- | untapStep
 -- アンタップ・ステップのターン起因処理関連はここで行わないといけない
-| transStep: ∀s s₁ s₂,
-  ProgressPhaseRel s s₁
-  → ProgressPhaseRel s₁ s₂
-  → ProgressPhaseRel s s₂
+| transStep: ∀s₁ s₂ s₃,
+  ProgressPhaseRel s₁ s₂
+  → ProgressPhaseRel s₂ s₃
+  → ProgressPhaseRel s₁ s₃
+| priorityRel: ∀s₁ s₂ s₃,
+  PriorityRel s₁ s₂
+  → ProgressPhaseRel s₂ s₃
+  → ProgressPhaseRel s₁ s₃
+
 
 inductive ProgressTurnRel: GameState → GameState → Prop
 | nextTurn:
@@ -163,9 +242,28 @@ inductive ProgressTurnRel: GameState → GameState → Prop
   -- ターン起因処理と状況起因処理，誘発型能力の誘発をした状態にする．
 | extraTurn:
   ∀ (s: GameState) (p : Player) (next: TurnList),
-  s.turnList = p::next ∧ s.phaseList = [Phase.ending cleanup]
+  ¬ next = [] 
+  ∧ s.turnList = p::next ∧ s.phaseList = [Phase.ending cleanup]
   → ProgressTurnRel s {s with turnList := next, phaseList := defaultPhaseList}
-| transTurn: ∀s s₁ s₂,
-  ProgressTurnRel s s₁
-  → ProgressTurnRel s₁ s₂
-  → ProgressTurnRel s s₂
+| transTurn: ∀s₁ s₂ s₃,
+  ProgressTurnRel s₁ s₂
+  → ProgressTurnRel s₂ s₃
+  → ProgressTurnRel s₁ s₃
+| phaseRel: ∀s₁ s₂ s₃,
+  ProgressPhaseRel s₁ s₂
+  → ProgressTurnRel s₂ s₃
+  → ProgressTurnRel s₁ s₃
+
+#print List
+
+example : ProgressTurnRel GameState.default {GameState.default with turnList := [player₂]} := by {
+  let s: GameState := GameState.default;
+  have h0 : s = GameState.default := rfl;
+  have h1 : s.turnList = [player₁] := rfl;
+  have h2 : s.priority = PriorityOwner.player player₁ := rfl;
+  have h3 : s.playerStates[player₁].passPriority = false := rfl;
+  rw [h0] at *;
+  have h4 := And.intro h2 h3;
+  have h5 := PriorityRel.passPriority Inhabited.default player₁ h4;
+  
+}
