@@ -158,7 +158,6 @@ def PlayerStateStore.getOp (self: PlayerStateStore) (idx: Player) : PlayerState 
   | player₃ => self.p₃
   | player₄ => self.p₄
 notation:100 st "[ " pl " ↦ " ps " ]" => UpdatePlayerStateStore st pl ps
-#print Std.HashSet
 
 inductive PriorityOwner
 | none
@@ -195,8 +194,16 @@ def updateEveryPriority (ps: PlayerStateStore) (p: Bool) :=
   let ps₃ := updatePriority ps₂ player₃ p;
   updatePriority ps₃ player₄ p
 
-#check @Exists
-#check @Sigma
+theorem preservePlayerState : ∀s p p' b, p ≠ p' → (updatePriority s p b)[p'] = s[p'] := by {
+  intro s p p' b neq;
+  cases p;
+  all_goals cases p';
+  all_goals try contradiction;
+  all_goals simp [PlayerStateStore.getOp, updatePriority, UpdatePlayerStateStore];
+}
+
+--#check @Exists
+--#check @Sigma
 
 inductive PriorityRel: GameState → GameState → Prop
 | passPriority: ∀(s: GameState) (p: Player),
@@ -225,7 +232,6 @@ inductive PriorityRel: GameState → GameState → Prop
   }
 -- その他の行動をできるようにする
 
-
 inductive ProgressPhaseRel: GameState → GameState → Prop
 | nextStep: ∀(s: GameState) (p: Phase) (next: PhaseList),
   s.phaseList = p::next ∧ s.didEveryPlayerPassTheirPriority = true
@@ -242,7 +248,6 @@ inductive ProgressPhaseRel: GameState → GameState → Prop
   PriorityRel s₁ s₂
   → ProgressPhaseRel s₂ s₃
   → ProgressPhaseRel s₁ s₃
-
 
 inductive ProgressTurnRel: GameState → GameState → Prop
 | nextTurn:
@@ -264,7 +269,7 @@ inductive ProgressTurnRel: GameState → GameState → Prop
   → ProgressTurnRel s₂ s₃
   → ProgressTurnRel s₁ s₃
 
-#print List
+--#print List
 
 theorem proofOfPriorityRel : ∀(s: GameState) (p: Player),
 s.priority = (PriorityOwner.player p)
@@ -282,12 +287,17 @@ s.priority = (PriorityOwner.player p)
   have h2: s'.priority = PriorityOwner.player (s.setting.nextplayer.1 p) := rfl;
   have h3: s.playerStates[s.setting.nextplayer.1 p].passPriority = s'.playerStates[s.setting.nextplayer.1 p].passPriority := by {
     generalize h4: s.setting.nextplayer.1 p = p';
-    have h5 : p' ≠ p := by {
+    have h5 : p ≠ p' := by {
         have h6 := s.setting.nextplayer.2 p;
-        rw [←h4];
-        assumption;
+        intro a;
+        rw [h4, a] at h6;
+        contradiction;
     }
-
+    have h6 := preservePlayerState s.playerStates p p' true h5;
+    cases p;
+    all_goals cases p';
+    all_goals try contradiction;
+    all_goals simp [h6];
   }
   have h4 := And.intro h1 (And.intro h2 h3);
   exact Exists.intro s' h4;
