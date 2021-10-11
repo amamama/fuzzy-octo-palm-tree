@@ -23,12 +23,21 @@ inductive Player: Type
 deriving DecidableEq
 open Player
 instance : Inhabited Player where default := player₁
-def NextPlayerType := Player → Player
-def NextPlayerType.default: NextPlayerType
-| player₁ => player₂
-| player₂ => player₃
-| player₃ => player₄
-| player₄ => player₁
+def NextPlayerType := ∃f: Player → Player, ∀p: Player, ¬f p = p
+def NextPlayerType.default: NextPlayerType := by {
+  let f 
+  | player₁ => player₂
+  | player₂ => player₃
+  | player₃ => player₄
+  | player₄ => player₁
+  exists f;
+  intro p';
+  cases p';
+  all_goals {
+    intro;
+    contradiction;
+  }
+}
 instance : Inhabited NextPlayerType where default := NextPlayerType.default
 def PlayerToNat: Player → Nat
 | player₁ => 0
@@ -98,9 +107,9 @@ instance : Inhabited GameSetting where
       Std.AssocList.empty
       |> Std.AssocList.cons player₁ true
       |> Std.AssocList.cons player₂ true
-      |> Std.AssocList.cons player₃ false
-      |> Std.AssocList.cons player₄ false,
-      nextplayer := Inhabited.default,
+      |> Std.AssocList.cons player₃ true
+      |> Std.AssocList.cons player₄ true,
+      nextplayer := NextPlayerType.default,
   }
 def Zone := Std.HashSet Nat
   deriving Inhabited
@@ -111,7 +120,6 @@ structure PlayerState where
   --graveyard: Zone
   --pool: Int
   passPriority: Bool
-  --deriving Inhabited de arbitrary ni narunode kou sinaito ikenai
 def PlayerState.default: PlayerState := {
   hand := Inhabited.default,
   deck := Inhabited.default,
@@ -128,7 +136,6 @@ structure PlayerStateStore where
   p₂: PlayerState
   p₃: PlayerState
   p₄: PlayerState
-  --deriving Inhabited de arbitrary ni narunode kou sinaito ikenai
 def PlayerStateStore.default: PlayerStateStore := {
   p₁:= Inhabited.default, 
   p₂:= Inhabited.default,
@@ -188,13 +195,16 @@ def updateEveryPriority (ps: PlayerStateStore) (p: Bool) :=
   let ps₃ := updatePriority ps₂ player₃ p;
   updatePriority ps₃ player₄ p
 
+#check @Exists
+#check @Sigma
+
 inductive PriorityRel: GameState → GameState → Prop
 | passPriority: ∀(s: GameState) (p: Player),
   s.priority = PriorityOwner.player p ∧ s.playerStates[p].passPriority = false -- かつ ターン起因処理と誘発型能力を積み終わった
   → PriorityRel s
   {
     s with
-    priority := PriorityOwner.player (s.setting.nextplayer p),
+    priority := PriorityOwner.player (s.setting.nextplayer.1 p),
     playerStates := updatePriority s.playerStates p true
   } -- MEMO: koko motto iikannji ni sitai
 | transPriority: ∀s₁ s₂ s₃,
@@ -238,7 +248,7 @@ inductive ProgressTurnRel: GameState → GameState → Prop
 | nextTurn:
   ∀ (s: GameState) (p: Player),
   s.turnList = [p] ∧ s.phaseList = [Phase.ending cleanup]
-  → ProgressTurnRel s {s with turnList := [s.setting.nextplayer p], phaseList := defaultPhaseList}
+  → ProgressTurnRel s {s with turnList := [s.setting.nextplayer.1 p], phaseList := defaultPhaseList}
   -- ターン起因処理と状況起因処理，誘発型能力の誘発をした状態にする．
 | extraTurn:
   ∀ (s: GameState) (p : Player) (next: TurnList),
@@ -256,14 +266,52 @@ inductive ProgressTurnRel: GameState → GameState → Prop
 
 #print List
 
+theorem proofOfPriorityRel : ∀(s: GameState) (p: Player),
+s.priority = (PriorityOwner.player p)
+∧ s.playerStates[p].passPriority = false
+→ ∃s', PriorityRel s s'
+∧ s'.priority = PriorityOwner.player (s.setting.nextplayer.1 p)
+∧ s.playerStates[s.setting.nextplayer.1 p].passPriority = s'.playerStates[s.setting.nextplayer.1 p].passPriority := by {
+  intros s p h;
+  have h1 := (PriorityRel.passPriority s p h);
+  let s' := {
+    s with
+    priority := PriorityOwner.player (s.setting.nextplayer.1 p),
+    playerStates := updatePriority s.playerStates p true
+  };
+  have h2: s'.priority = PriorityOwner.player (s.setting.nextplayer.1 p) := rfl;
+  have h3: s.playerStates[s.setting.nextplayer.1 p].passPriority = s'.playerStates[s.setting.nextplayer.1 p].passPriority := by {
+    generalize h4: s.setting.nextplayer.1 p = p';
+    have h5 : p' ≠ p := by {
+        have h6 := s.setting.nextplayer.2 p;
+        rw [←h4];
+        assumption;
+    }
+
+  }
+  have h4 := And.intro h1 (And.intro h2 h3);
+  exact Exists.intro s' h4;
+}
+
 example : ProgressTurnRel GameState.default {GameState.default with turnList := [player₂]} := by {
   let s: GameState := GameState.default;
-  have h0 : s = GameState.default := rfl;
-  have h1 : s.turnList = [player₁] := rfl;
-  have h2 : s.priority = PriorityOwner.player player₁ := rfl;
-  have h3 : s.playerStates[player₁].passPriority = false := rfl;
+  have h0: s = GameState.default := rfl;
+  have h1: s.turnList = [player₁] := rfl;
+  have h2: s.priority = PriorityOwner.player player₁ := rfl;
+  have h3: s.playerStates[player₁].passPriority = false := rfl;
   rw [h0] at *;
   have h4 := And.intro h2 h3;
-  have h5 := PriorityRel.passPriority Inhabited.default player₁ h4;
-  
+  /-
+  have h5 := PriorityRel.passPriority GameState.default player₁ h4;
+  let s1 := {
+    s with
+    priority := PriorityOwner.player (s.setting.nextplayer player₁),
+    playerStates := updatePriority s.playerStates player₁ true,
+  }
+  -/
+  have ⟨s1, ⟨h5, h6, h7⟩⟩ := proofOfPriorityRel s player₁ h4;
+  have h8: s.setting.nextplayer.1 player₁ = player₂ := rfl;
+  rw [h8] at h6;
+  rw [h8] at h7;
+  have h9 := And.intro h6 h7;
 }
