@@ -113,8 +113,7 @@ def GameSetting.default: GameSetting := {
   }
 instance : Inhabited GameSetting where
   default := GameSetting.default
-def Zone := Std.HashSet Nat
-  deriving Inhabited
+abbrev Zone := Std.HashSet Nat
 structure PlayerState where
   hand: Zone
   deck: Zone
@@ -235,6 +234,53 @@ inductive PriorityRel: GameState → GameState → Prop
   }
 -- その他の行動をできるようにする
 
+theorem proofOfPassPriority: ∀s p,
+s.priority = (PriorityOwner.player p)
+∧ s.playerStates[p].passPriority = false
+→ ∃s', PriorityRel s s' 
+∧ s' = {
+    s with
+    priority := PriorityOwner.player (s.setting.nextplayer.1 p),
+    playerStates := updatePriority s.playerStates p true,
+  } := by
+{
+  intros s p h;
+  let s' := {
+    s with
+    priority := PriorityOwner.player (s.setting.nextplayer.1 p),
+    playerStates := updatePriority s.playerStates p true,
+  };
+  exists s';
+  apply And.intro;
+  exact (PriorityRel.passPriority s p h);
+  rfl;
+}
+
+theorem proofOfEveryPlayerPassTheirPriority: ∀s p tl,
+s.priority = PriorityOwner.player p
+∧ s.turnList = p :: tl
+∧ (∀(p: Player),
+  Std.AssocList.contains p s.setting.joinedPlayers
+  ∧ Std.AssocList.find? p s.setting.joinedPlayers = some true
+  ∧ s.playerStates[p].passPriority = true)
+→ ∃s', PriorityRel s s'
+∧ s' = {
+  s with
+  playerStates := updateEveryPriority s.playerStates false,
+  didEveryPlayerPassTheirPriority := true,
+} := by {
+  intros s p tl h1;
+  let s' := {
+    s with
+    playerStates := updateEveryPriority s.playerStates false,
+    didEveryPlayerPassTheirPriority := true,
+    };
+  exists s';
+  apply And.intro;
+  exact PriorityRel.everyPlayerPassTheirPriority s p tl h1;
+  rfl;
+}
+
 inductive ProgressPhaseRel: GameState → GameState → Prop
 | nextStep: ∀(s: GameState) (p: Phase) (next: PhaseList),
   s.phaseList = p::next ∧ s.didEveryPlayerPassTheirPriority = true
@@ -272,52 +318,6 @@ inductive ProgressTurnRel: GameState → GameState → Prop
   → ProgressTurnRel s₁ s₃
 
 --#print List
-
-theorem proofOfPassPriority: ∀s p,
-s.priority = (PriorityOwner.player p)
-∧ s.playerStates[p].passPriority = false
-→ ∃s', PriorityRel s s' 
-∧ s' = {
-    s with
-    priority := PriorityOwner.player (s.setting.nextplayer.1 p),
-    playerStates := updatePriority s.playerStates p true,
-  } := by {
-  intros s p h;
-  let s' := {
-    s with
-    priority := PriorityOwner.player (s.setting.nextplayer.1 p),
-    playerStates := updatePriority s.playerStates p true,
-  };
-  exists s';
-  apply And.intro;
-  exact (PriorityRel.passPriority s p h);
-  rfl;
-}
-
-theorem proofOfEveryPlayerPassTheirPriority: ∀s p tl,
-s.priority = PriorityOwner.player p
-∧ s.turnList = p :: tl
-∧ (∀(p: Player),
-  Std.AssocList.contains p s.setting.joinedPlayers
-  ∧ Std.AssocList.find? p s.setting.joinedPlayers = some true
-  ∧ s.playerStates[p].passPriority = true)
-→ ∃s', PriorityRel s s'
-∧ s' = {
-  s with
-  playerStates := updateEveryPriority s.playerStates false,
-  didEveryPlayerPassTheirPriority := true,
-} := by {
-  intros s p tl h1;
-  let s' := {
-    s with
-    playerStates := updateEveryPriority s.playerStates false,
-    didEveryPlayerPassTheirPriority := true,
-    };
-  exists s';
-  apply And.intro;
-  exact PriorityRel.everyPlayerPassTheirPriority s p tl h1;
-  rfl;
-}
 
 example : ProgressTurnRel GameState.default {GameState.default with turnList := [player₂]} := by {
   let s: GameState := GameState.default;
