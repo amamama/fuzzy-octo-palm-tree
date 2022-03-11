@@ -132,7 +132,7 @@ instance {n: ℕ} : Coe (Perm n) (Perm (n + 1)) :=
     simp [bije];
     intro y;
     have h2 := Nat.lt_irrefl n;
-    byCases h: y = n;
+    by_cases h: y = n;
     case inl => {
       exists y;
       rw [h];
@@ -140,9 +140,10 @@ instance {n: ℕ} : Coe (Perm n) (Perm (n + 1)) :=
       intro x' h1;
       induction x' with
       | mk v lt => {
-        byCases h3: v = n;
+        by_cases h3: v = n;
         simp [h3, h2] at h1;
-        assumption;
+        apply Fin.eq_of_val_eq;
+        simp [h1, h3];
         have h4 := Nat.lt_of_le_of_ne (Nat.le_of_lt_succ lt) h3;
         simp [h4] at h1;
         generalize h5: p.val ⟨v, h4⟩ = v';
@@ -173,7 +174,7 @@ instance {n: ℕ} : Coe (Perm n) (Perm (n + 1)) :=
         rw [h2l] at h5;
         induction x' with
         | mk v lt => {
-          byCases h6: v = n;
+          by_cases h6: v = n;
           simp [h6, h2] at h5;
           have h7: y.val = v := Eq.trans h5 (Eq.symm h6);
           rw [h6] at h7;
@@ -216,7 +217,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
   generalize pn: p nFin = pnFin;
   let downcast: (x: Fin (n + 1)) → (x ≠ nFin) → Fin n := λx h => ⟨x.val, by {
     have h1 := x.isLt;
-    byCases h2: x.val = nFin.val;
+    by_cases h2: x.val = nFin.val;
     have h3 := Fin.eq_of_val_eq h2;
     contradiction;
     simp at h2;
@@ -226,7 +227,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
   have downcast_aux: ∀x: Fin n, ↑x ≠ nFin := by {
     intro x h;
     have h1 := x.isLt;
-    byCases h2: x = n;
+    by_cases h2: x = n;
     rw [h2] at h1;
     have h3 := Nat.lt_irrefl n;
     contradiction;
@@ -256,7 +257,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
   let f: Fin n → Fin n := λx => ⟨if cond: ↑x = whnFin then pnFin else p ↑x, by {
     have f_aux: ∀x, x ≠ whnFin → p x < n := by {
       intros x h3;
-      byCases h4: (p x) < n;
+      by_cases h4: (p x) < n;
       assumption;
       have h5 := (p x).isLt;
       have h6: (p x).val = n := by {
@@ -279,8 +280,8 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
       specialize prop_hnFinr prop_hnFinl;
       exact absurd (Eq.symm prop_hnFinr) h3;
     };
-    byCases h1: nFin = p nFin;
-    all_goals byCases h2: ↑x = whnFin;
+    by_cases h1: nFin = p nFin;
+    all_goals by_cases h2: ↑x = whnFin;
     all_goals simp [h2];
     specialize prop_hnFinr nFin (Eq.trans prop_hnFinl h1);
     have _ := downcast_aux x;
@@ -301,7 +302,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
   let q: Perm n := ⟨f, by {
     simp [bije];
     intro y;
-    byCases h1: nFin = p nFin;
+    by_cases h1: nFin = p nFin;
     case inl => {
       specialize prop_hnFinr nFin (Eq.trans prop_hnFinl h1);
       have h3: ∀x: Fin n, ↑x ≠ whnFin := by {
@@ -311,7 +312,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
       };
       have ⟨w, ⟨h4l, h4r⟩⟩ := h ↑y;
       have h5 := h3 y;
-      byCases h6: w = whnFin;
+      by_cases h6: w = whnFin;
       rw [h6, prop_hnFinl, ←prop_hnFinr] at h4l;
       exact absurd (Eq.symm h4l) h5;
       rw [prop_hnFinr] at h6;
@@ -361,7 +362,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
         rw [←h4] at prop_hnFinl;
         exact absurd (Eq.symm prop_hnFinl) h1;
       };
-      byCases h4: ↑y = pnFin;
+      by_cases h4: ↑y = pnFin;
       case inl => {
         exists downcast whnFin (Ne.symm h3);
         have h5 := coe_downcast whnFin (Ne.symm h3);
@@ -374,7 +375,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
         case right => {
           intro x' h7;
           simp [h5] at h7;
-          byCases h8: ↑x' = whnFin;
+          by_cases h8: ↑x' = whnFin;
           apply Fin.eq_of_val_eq;
           simp;
           have h9 := Eq.symm (Fin.val_eq_of_eq h8);
@@ -414,7 +415,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
         case left => {
           apply Fin.eq_of_val_eq;
           simp [h8];
-          byCases h9: w = whnFin;
+          by_cases h9: w = whnFin;
           rw [h9, prop_hnFinl] at h6l;
           have h10: n = y.val := by {
             have h11 := Fin.val_eq_of_eq h6l;
@@ -438,8 +439,8 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
         case right => {
           intro x' h9;
           simp [h8] at h9;
-          byCases h10: w = whnFin;
-          all_goals byCases h11: ↑x' = whnFin;
+          by_cases h10: w = whnFin;
+          all_goals by_cases h11: ↑x' = whnFin;
           all_goals simp [h10, h11] at h9;
           apply Fin.eq_of_val_eq;
           simp;
@@ -476,7 +477,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
       };
     };
   }⟩;
-  byCases h1: nFin = p nFin;
+  by_cases h1: nFin = p nFin;
   --恒等写像との合成になる場合
   case inl => {
     specialize prop_hnFinr nFin (Eq.trans prop_hnFinl h1);
@@ -489,7 +490,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
     --simp;
     apply funext;
     intro x;
-    byCases h4: x = whnFin;
+    by_cases h4: x = whnFin;
     case inl => {
       rw [h4];
       have h5: ¬whnFin < n := by {
@@ -532,32 +533,32 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
         ⟨λx => if x = pnFin then nFin else if x = nFin then pnFin else x, by {
           simp [bije];
           intro y;
-          byCases h2: y = nFin;
+          by_cases h2: y = nFin;
           exists pnFin;
           simp;
           rw [h2];
           simp;
           intro x' h3;
-          byCases h4: x' = pnFin;
+          by_cases h4: x' = pnFin;
           exact Eq.symm h4;
           simp [h4] at h3;
-          byCases h5: x' = nFin;
+          by_cases h5: x' = nFin;
           simp [h5] at h3;
           rw [pn] at h1;
           contradiction;
           simp [h5] at h3;
           rw [←h3] at h5;
           simp at h5;
-          byCases h3: y = pnFin;
+          by_cases h3: y = pnFin;
           exists nFin;
           simp [←pn, h1, h3];
           intro x' h4;
-          byCases h5: x' = pnFin;
+          by_cases h5: x' = pnFin;
           simp [pn, h5] at h4;
           rw [pn, h4] at h1;
           exact absurd rfl h1;
           simp [pn, h5] at h4;
-          byCases h6: x' = nFin;
+          by_cases h6: x' = nFin;
           rw [h6];
           simp [h6] at h4;
           rw [h4] at h5;
@@ -565,11 +566,11 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
           exists y;
           simp [h3, h2];
           intro x' h4;
-          byCases h5: x' = pnFin;
+          by_cases h5: x' = pnFin;
           simp [h5] at h4;
           contradiction;
           simp [h5] at h4;
-          byCases h6: x' = nFin;
+          by_cases h6: x' = nFin;
           simp [h6] at h4;
           contradiction;
           simp [h6] at h4;
@@ -604,7 +605,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
     apply funext;
     intro x;
     simp [HMul.hMul, Mul.mul, Bijection.comp];
-    byCases h2: x = nFin;
+    by_cases h2: x = nFin;
     case inl => {
       simp [h2];
       have h3: (↑q:Perm (n + 1)).val nFin = nFin := by {
@@ -624,7 +625,7 @@ theorem perm_compose_trans {n: ℕ} : ∀p: Perm (n + 1), ∃q: Perm n, p = ↑q
       --simp [coe, CoeT.coe, CoeHTCT.coe, coeTC, CoeTC.coe, coeB, Coe.coe];
       have h3 := ltn x h2;
       simp [h3];
-      byCases h4: x = whnFin;
+      by_cases h4: x = whnFin;
       have h5: (↑q: Perm (n + 1)).val whnFin = pnFin := by {
         --simp [coe, CoeT.coe, CoeHTCT.coe, coeTC, CoeTC.coe, coeB, Coe.coe];
         have h6 := Fin.val_eq_of_eq h4;

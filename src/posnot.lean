@@ -581,8 +581,3 @@ theorem keta_no_wa_no_amari_eq_moto_no_kazu_no_amari {b: {n: Nat // n > 1}} : �
 }
 
 #eval Lean.versionString
-
-variable (α : Sort u)
-variable (r : α → α → Prop)
-
-#check (Acc r : α → Prop)
