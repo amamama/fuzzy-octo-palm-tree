@@ -73,3 +73,21 @@ syntax "repeatWithNat " term " => " tacticSeq : tactic
 macro_rules
   | `(tactic| repeatWithNat $num => $seq) => `(tactic| first | let trialNum := $num; ($seq); repeatWithNat (Nat.succ $num) => $seq | skip)
 
+
+def h: ∃x, x = 0 := Subtype.existsOfSubtype ⟨0, by rfl⟩
+noncomputable def aaaa: Nat := sorry
+#check Classical.choice
+noncomputable def indefiniteDescription {α : Sort u} {p : α → Prop} (h : ∃ x, p x) : {x // p x} :=
+  Classical.choice <| let ⟨x, px⟩ := h; ⟨⟨x, px⟩⟩
+noncomputable def hoge {α : Sort u} {p : α → Prop} (h : ∃ x, p x) : Nonempty {x // p x} :=
+let ⟨w, prop⟩ := h; ⟨w, prop⟩
+--てすと,カタカナ，漢字．１２３ｂｃｓ
+
+constant magic (h : ∃ n : ℕ, n > 0) : ℕ
+axiom magic_extract (n h) : magic ⟨n, h⟩ = n
+
+example : false :=
+have h1 : magic ⟨1, sorry⟩ = 1 := magic_extract _ _;
+have h2 : magic ⟨2, sorry⟩ = 2 := magic_extract _ _;
+have proof_irrel : magic ⟨1, sorry⟩ = magic ⟨2, sorry⟩ := rfl;
+absurd (h1.symm.trans $ proof_irrel.trans h2) sorry

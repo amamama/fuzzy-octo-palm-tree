@@ -68,7 +68,7 @@ theorem hodai2: ∀n m: Nat,  n > 0 → m ≥ 2 → n / m < n := by {
       apply @Nat.lt_of_lt_of_le 0 2;
       simp;
       assumption;
-    }
+    };
     have q := Nat.le_refl y;
     simp [pe, q, pi, Nat.sub_self];
     have w := Nat.div_eq 0 y;
@@ -76,11 +76,7 @@ theorem hodai2: ∀n m: Nat,  n > 0 → m ≥ 2 → n / m < n := by {
     simp [(Nat.not_le_of_gt pe)];
     rw [w];
     simp [h2];
-    have : ¬(0 ≥ y) := by {
-      intro;
-      have := Nat.not_le_of_gt pe;
-      contradiction;
-    };
+    have := Nat.not_eq_zero_of_lt pe;
     simp [this];
     exact Nat.lt_of_succ_le h1;
     intro hh;
@@ -138,9 +134,9 @@ theorem hodai5: ∀n m k: Nat, m ≤ n → n + k - m = n - m + k := by {
       intro n;
       induction n;
       simp;
-      intro h1;
-      have h5 := Nat.eq_zero_of_le_zero h1;
-      contradiction;
+      --intro h1;
+      --have h5 := Nat.eq_zero_of_le_zero h1;
+      --contradiction;
       case succ n ih3 => {
         intro h1;
         simp [Nat.succ_sub_succ];
