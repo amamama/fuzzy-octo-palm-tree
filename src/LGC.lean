@@ -1,7 +1,5 @@
--- Linear Congruential Generator
-
 @[simp]
-def Periodic_with_period (f: Nat → Nat) (p: Nat): Prop := ∀n, f (n + p) = f n
+def Periodic_with_period (f: Nat → Nat) (p: Nat): Prop := p > 0 ∧ ∀n, f (n + p) = f n
 @[simp]
 def Periodic (f: Nat → Nat) : Prop := ∃p, Periodic_with_period f p
 @[simp]
@@ -43,7 +41,7 @@ theorem add_left_mod : ∀m n k: Nat, (k + m) % n = (k + m % n) % n := by {
   | ind x y ih1 ih2 => {
     intro k;
     rw [Nat.mod_eq x y];
-    simp [ih1, ←(ih2 k)];
+    simp [ih1, ←ih2];
     rw [Nat.mod_eq];
     simp [ih1];
     have h1 := Nat.add_le_add  (Nat.zero_le k) (ih1.right);
@@ -92,7 +90,7 @@ theorem mul_left_mod : ∀m n k: Nat, (k * m) % n = (k * (m % n)) % n := by {
       rw [Nat.succ_mul k x, Nat.succ_mul k y];
       rw [←Nat.sub_sub, Nat.add_comm, Nat.add_sub_assoc (Nat.mul_le_mul_left k ih1.right)];
       rw [Nat.add_comm x (k * x - _), Nat.add_sub_assoc ih1.right];
-      rw [add_mod _ (x - y), ←ih, ←add_mod, Nat.add_comm];
+      rw [@add_mod _ (x - y), ←ih, ←add_mod, Nat.add_comm];
       rw [Nat.mod_eq];
       have := Nat.add_le_add (Nat.zero_le (k * x)) ih1.right;
       simp_all
@@ -201,6 +199,89 @@ theorem odd_mod_even_is_odd : ∀m n, ((2 * m + 1) % (2 * n)) % 2 = 1 := by {
   }
 }
 
+theorem mod_eq_zero_of_add_mod : ∀{m n k}, (k + m) % n = m % n → k % n = 0 := by {
+  intro m n k h1;
+  rw [add_mod] at h1;
+  induction k, n using Nat.mod.inductionOn with
+  | ind x y ih1 ih2 => {
+    rw [Nat.mod_eq];
+    simp [ih1];
+    rw [Nat.mod_eq x y] at h1;
+    simp [ih1] at h1;
+    specialize ih2 h1;
+    assumption;
+  }
+  | base x y h2 => {
+    rw [Nat.mod_eq];
+    simp [h2];
+    rw [Nat.mod_eq x y] at h1;
+    simp [h2] at h1;
+    rw [←add_left_mod m y x] at h1;
+    induction m, y using Nat.mod.inductionOn with
+    | ind x1 y1 ih1 ih2 => {
+      rw [Nat.mod_eq] at h1;
+      have := Nat.add_le_add (Nat.zero_le x) ih1.right;
+      simp at this;
+      simp [ih1, this, Nat.add_sub_assoc, Nat.mod_eq x1 y1] at h1;
+      specialize ih2 h2 h1;
+      assumption;
+    }
+    | base x1 y1 h3 => {
+      simp [Nat.mod_eq x1 y1, h3] at h1;
+      cases y1;
+      simp [Nat.mod_zero] at h1;
+      apply Nat.add_right_cancel;
+      case m => {exact x1};
+      simp;
+      assumption;
+      case succ n => {
+        have h4 := Nat.zero_lt_succ n;
+        have h5 := hoge h4 h2 |> Nat.gt_of_not_le;
+        have h6 := hoge h4 h3 |> Nat.gt_of_not_le;
+        cases x;
+        simp;
+        case succ x => {
+          simp_all;
+          rw [Nat.mod_eq] at h1;
+          simp [h4] at h1;
+          by_cases h8: Nat.succ n ≤ Nat.succ x + x1;
+          simp [h8] at h1;
+          rw [Nat.mod_eq] at h1;
+          simp [h4] at h1;
+          have : ¬Nat.succ n ≤ Nat.succ x + x1 - Nat.succ n := by {
+            intro nh;
+            have h9 := Nat.le_of_lt_succ h6;
+            have h10 := Nat.le_of_lt_succ h5;
+            have h11 := Nat.add_le_add h9 h10;
+            have h12 := Nat.add_le_of_le_sub h8 nh;
+            rw [Nat.add_comm] at h11;
+            have h13 := Nat.le_trans (Nat.le_trans h12 h11) (Nat.le_succ (n + n));
+            simp [Nat.succ_add, Nat.add_comm n] at h13;
+            have h14 := Nat.not_succ_le_self (Nat.succ (n + n));
+            contradiction;
+          };
+          simp [this] at h1;
+          have := congrArg (λx => Nat.succ n + x) h1;
+          simp [←Nat.add_sub_assoc h8, Nat.add_sub_cancel_left] at this;
+          have h9 := Nat.add_right_cancel this;
+          simp at h9;
+          have h10 := Nat.lt_of_succ_lt_succ h5;
+          rw [h9] at h10;
+          have := Nat.lt_irrefl n;
+          contradiction;
+          simp [*] at h1;
+          conv at h1 => {
+            rhs
+            rw [←Nat.zero_add x1]
+          };
+          have h11 := Nat.add_right_cancel h1;
+          simp at h11;
+        };
+      };
+    }
+  }
+}
+
 def f1 n := n % 3
 theorem t1 : Periodic f1 := by {
   rw [Periodic];
@@ -215,6 +296,7 @@ def f2
 theorem t2 : Periodic f2 := by {
   simp;
   exists 6;
+  simp;
   intro n;
   simp [f2];
   rw [←mul_left_mod (3 * f2 n) 7 3];
@@ -240,23 +322,54 @@ theorem t3 : ∀l m n, let f := (λx: Nat => (x * (4 * l + 1) + (2 * m + 1)) % (
   intro l m n;
   simp;
   generalize hM : 2 ^ n = M;
-  generalize ha : 4 * l + 1 = a;
+  generalize ha : 4 * l = A;
   generalize hc : 2 * m + 1 = c;
+
+  have hoge: ∀n: Nat, 2 ^ n > 0 := by {
+    intro n;
+    induction n;
+    simp;
+    case succ n ih => {
+      have := Nat.mul_lt_mul_of_pos_right ih (Nat.zero_lt_succ 1);
+      simp at this;
+      simp[Nat.pow_succ, this];
+    };
+  };
 
   apply And.intro;
   case left => {
+    cases M;
+    simp;
+    specialize hoge n;
+    simp [hM] at hoge;
+    simp [Nat.zero_lt_succ];
     intro x;
-    rw [Nat.add_mul, Nat.add_assoc, Nat.add_comm _ c, ←Nat.add_assoc, Nat.mul_comm M, add_mod, mul_mod_eq_zero];
+    rw [Nat.add_mul, Nat.add_assoc, Nat.add_comm _ c, ←Nat.add_assoc, Nat.mul_comm (Nat.succ _), add_mod, mul_mod_eq_zero];
     simp [mod_mod_eq_mod];
   };
   case right => {
-    intro M0 h1 h2;
-    have h3 := h2 0;
+    intro M0 h1 ⟨h2l, h2r⟩;
+    have h3 := h2r 0;
     simp at h3;
     rw [←ha, ←hc, ←hM] at h3;
     cases n;
     simp [Nat.pow_zero, Nat.mod_one] at h3;
     simp [Nat.pow_zero] at hM;
     rw [←hM] at h1;
+    have a := Nat.le_of_lt_succ h1;
+    simp [Nat.le_zero_eq M0] at a;
+    rw [a] at h2l;
+    contradiction;
+    case succ n => {
+      simp [Nat.pow_succ] at h3;
+      have h4 := odd_mod_even_is_odd m (2 ^ n);
+      rw [add_mod] at h3;
+      conv at h3 => {
+        rhs;
+        rw [←mod_mod_eq_mod];
+      };
+      have h5 := mod_eq_zero_of_add_mod h3;
+      rw [mod_mod_eq_mod] at h5;
+     };
   };
 }
